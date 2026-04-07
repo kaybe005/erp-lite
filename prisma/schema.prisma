@@ -1,0 +1,131 @@
+generator client {
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum PurchaseOrderStatus {
+  PENDING
+  RECEIVED
+  CANCELLED
+}
+
+enum SalesOrderStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+model User {
+  id             String          @id @default(cuid())
+  name           String
+  email          String          @unique
+  passwordHash   String
+  role           Role            @default(STAFF)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  purchaseOrders PurchaseOrder[]
+  salesOrders    SalesOrder[]
+
+  @@map("users")
+}
+
+model Product {
+  id                 String              @id @default(cuid())
+  name               String
+  sku                String              @unique
+  category           String
+  description        String?
+  unitPrice          Decimal             @db.Decimal(10, 2)
+  quantityInStock    Int                 @default(0)
+  reorderLevel       Int                 @default(10)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  purchaseOrderItems PurchaseOrderItem[]
+  salesOrderItems    SalesOrderItem[]
+
+  @@map("products")
+}
+
+model Supplier {
+  id             String          @id @default(cuid())
+  companyName    String
+  contactName    String
+  email          String?
+  phone          String?
+  address        String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id           String              @id @default(cuid())
+  orderNumber  String              @unique
+  supplierId   String
+  supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  status       PurchaseOrderStatus @default(PENDING)
+  createdById  String
+  createdBy    User                @relation(fields: [createdById], references: [id])
+  orderDate    DateTime            @default(now())
+  receivedDate DateTime?
+  notes        String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  items        PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+  quantity        Int
+  unitCost        Decimal       @db.Decimal(10, 2)
+
+  @@map("purchase_order_items")
+}
+
+model SalesOrder {
+  id           String           @id @default(cuid())
+  orderNumber  String           @unique
+  customerName String?
+  status       SalesOrderStatus @default(CONFIRMED)
+  createdById  String
+  createdBy    User             @relation(fields: [createdById], references: [id])
+  orderDate    DateTime         @default(now())
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  items        SalesOrderItem[]
+
+  @@map("sales_orders")
+}
+
+model SalesOrderItem {
+  id           String     @id @default(cuid())
+  salesOrderId String
+  salesOrder   SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  productId    String
+  product      Product    @relation(fields: [productId], references: [id])
+  quantity     Int
+  unitPrice    Decimal    @db.Decimal(10, 2)
+
+  @@map("sales_order_items")
+}
