@@ -11,7 +11,7 @@ export function PageWrapper({ title, description, children, action }: PageWrappe
   return (
     <div className="flex-1 flex flex-col min-h-screen">
       <Header title={title} description={description} />
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-6 max-w-[1600px] w-full mx-auto">
         {action && (
           <div className="flex justify-end mb-6">{action}</div>
         )}

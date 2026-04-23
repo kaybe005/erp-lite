@@ -2,16 +2,29 @@ import { prisma } from "@/lib/db"
 import { BadRequestError, ConflictError, NotFoundError } from "@/lib/errors"
 import { ProductInput } from "@/lib/validations"
 
+// Reusable include for supplier associations
+const productWithSuppliers = {
+  supplierProducts: {
+    include: {
+      supplier: {
+        select: { id: true, companyName: true },
+      },
+    },
+  },
+} as const
+
 export class ProductService {
   static async getAll() {
     return prisma.product.findMany({
       orderBy: { createdAt: "desc" },
+      include: productWithSuppliers,
     })
   }
 
   static async getById(id: string) {
     return prisma.product.findUnique({
       where: { id },
+      include: productWithSuppliers,
     })
   }
 
@@ -37,6 +50,7 @@ export class ProductService {
         quantityInStock: data.quantityInStock,
         reorderLevel: data.reorderLevel,
       },
+      include: productWithSuppliers,
     })
   }
 
@@ -64,6 +78,7 @@ export class ProductService {
         ...(data.quantityInStock !== undefined && { quantityInStock: data.quantityInStock }),
         ...(data.reorderLevel !== undefined && { reorderLevel: data.reorderLevel }),
       },
+      include: productWithSuppliers,
     })
   }
 
@@ -94,12 +109,36 @@ export class ProductService {
   }
 
   static async getLowStock() {
-    return prisma.product.findMany({
-      where: {
-        quantityInStock: {
-          lte: prisma.product.fields.reorderLevel,
+    // Uses lte (<=) to match the threshold logic used throughout the codebase
+    const allProducts = await prisma.product.findMany({
+      include: productWithSuppliers,
+      orderBy: { quantityInStock: "asc" },
+    })
+    return allProducts.filter((p) => p.quantityInStock <= p.reorderLevel)
+  }
+
+  static async getLinkedSuppliers(productId: string) {
+    return prisma.supplierProduct.findMany({
+      where: { productId },
+      include: {
+        supplier: {
+          select: { id: true, companyName: true, contactName: true, email: true },
         },
       },
+    })
+  }
+
+  static async syncSupplierLinks(productId: string, supplierIds: string[]) {
+    return prisma.$transaction(async (tx) => {
+      // Remove all existing links for this product
+      await tx.supplierProduct.deleteMany({ where: { productId } })
+      // Create the new set
+      if (supplierIds.length > 0) {
+        await tx.supplierProduct.createMany({
+          data: supplierIds.map((supplierId) => ({ productId, supplierId })),
+          skipDuplicates: true,
+        })
+      }
     })
   }
 

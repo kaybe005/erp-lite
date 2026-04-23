@@ -47,6 +47,10 @@ export const salesOrderSchema = z.object({
   items: z.array(salesOrderItemSchema).min(1, "At least one item is required"),
 })
 
+export const supplierProductSyncSchema = z.object({
+  supplierIds: z.array(z.string()).default([]),
+})
+
 export const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
@@ -59,6 +63,7 @@ export const createUserSchema = userSchema.extend({
   password: z.string().min(6, "Password must be at least 6 characters"),
 })
 
+export type SupplierProductSyncInput = z.infer<typeof supplierProductSyncSchema>
 export type LoginInput = z.infer<typeof loginSchema>
 export type ProductInput = z.infer<typeof productSchema>
 export type SupplierInput = z.infer<typeof supplierSchema>

@@ -29,6 +29,7 @@ interface Product {
   unitPrice: number
   quantityInStock: number
   reorderLevel: number
+  supplierProducts?: { supplier: { id: string; companyName: string } }[]
 }
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
@@ -66,6 +67,24 @@ export default function ProductsPage() {
     { header: "Name", accessor: "name" as const },
     { header: "SKU", accessor: "sku" as const },
     { header: "Category", accessor: "category" as const },
+    {
+      header: "Suppliers",
+      accessor: (item: Product) => {
+        const suppliers = item.supplierProducts?.map((sp) => sp.supplier.companyName) || []
+        if (suppliers.length === 0) {
+          return <span className="text-muted-foreground italic text-sm">None configured</span>
+        }
+        return (
+          <div className="flex flex-wrap gap-1">
+            {suppliers.map((name) => (
+              <Badge key={name} variant="secondary" className="text-xs font-normal">
+                {name}
+              </Badge>
+            ))}
+          </div>
+        )
+      },
+    },
     {
       header: "Unit Price",
       accessor: (item: Product) => `$${Number(item.unitPrice).toFixed(2)}`,

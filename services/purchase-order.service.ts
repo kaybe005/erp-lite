@@ -63,11 +63,30 @@ export class PurchaseOrderService {
       const productIds = [...new Set(data.items.map((item) => item.productId))]
       const products = await tx.product.findMany({
         where: { id: { in: productIds } },
-        select: { id: true },
+        select: { id: true, name: true },
       })
 
       if (products.length !== productIds.length) {
         throw new NotFoundError("One or more products were not found")
+      }
+
+      // Enforce supplier-product relationships: every product must be linked to the supplier
+      const supplierLinks = await tx.supplierProduct.findMany({
+        where: {
+          supplierId: data.supplierId,
+          productId: { in: productIds },
+        },
+        select: { productId: true },
+      })
+      const linkedProductIds = new Set(supplierLinks.map((l) => l.productId))
+
+      for (const product of products) {
+        if (!linkedProductIds.has(product.id)) {
+          throw new BadRequestError(
+            `Product "${product.name}" is not linked to the selected supplier. ` +
+              `Please configure the supplier-product relationship in the Products section before creating this order.`
+          )
+        }
       }
 
       return tx.purchaseOrder.create({

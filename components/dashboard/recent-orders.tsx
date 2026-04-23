@@ -38,12 +38,12 @@ export function RecentOrders({
             {emptyMessage}
           </p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2.5">
             {orders.map((order) => (
               <Link
                 key={order.id}
                 href={`${linkPrefix}/${order.id}`}
-                className="block p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                className="block p-3 rounded-lg border border-border hover:bg-muted/50 hover:border-border/80 hover:shadow-sm transition-all duration-150 group"
               >
                 <div className="flex items-center justify-between">
                   <div>

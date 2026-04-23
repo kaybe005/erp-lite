@@ -190,6 +190,69 @@ async function main() {
   }
   console.log("Upserted", sampleSuppliers.length, "suppliers")
 
+  // Seed supplier-product relationships
+  // Look up supplier and product IDs by their unique identifiers
+  const [
+    techSupply,
+    officeEssentials,
+    furnitureWorld,
+    globalElectronics,
+  ] = await Promise.all([
+    prisma.supplier.findFirst({ where: { companyName: "TechSupply Co." }, select: { id: true } }),
+    prisma.supplier.findFirst({ where: { companyName: "Office Essentials Inc." }, select: { id: true } }),
+    prisma.supplier.findFirst({ where: { companyName: "Furniture World" }, select: { id: true } }),
+    prisma.supplier.findFirst({ where: { companyName: "Global Electronics" }, select: { id: true } }),
+  ])
+
+  const [
+    keyboard, hub, chair, desk, stand, webcam, lamp, notebook,
+  ] = await Promise.all([
+    prisma.product.findUnique({ where: { sku: "KB-001" }, select: { id: true } }),
+    prisma.product.findUnique({ where: { sku: "HUB-002" }, select: { id: true } }),
+    prisma.product.findUnique({ where: { sku: "CHR-003" }, select: { id: true } }),
+    prisma.product.findUnique({ where: { sku: "DSK-004" }, select: { id: true } }),
+    prisma.product.findUnique({ where: { sku: "STD-005" }, select: { id: true } }),
+    prisma.product.findUnique({ where: { sku: "WEB-006" }, select: { id: true } }),
+    prisma.product.findUnique({ where: { sku: "LMP-007" }, select: { id: true } }),
+    prisma.product.findUnique({ where: { sku: "NB-008" }, select: { id: true } }),
+  ])
+
+  // Map: TechSupply Co. → Electronics (Keyboard, Hub, Webcam) + Monitor Stand (Accessories)
+  // Global Electronics → Electronics (Keyboard, Hub, Webcam) as alternate supplier
+  // Furniture World → Furniture (Chair, Desk) + Monitor Stand (Accessories)
+  // Office Essentials → Stationery (Notebook) + Lighting (Lamp)
+  const supplierProductLinks: { supplierId: string; productId: string }[] = []
+
+  if (techSupply && keyboard) supplierProductLinks.push({ supplierId: techSupply.id, productId: keyboard.id })
+  if (techSupply && hub)      supplierProductLinks.push({ supplierId: techSupply.id, productId: hub.id })
+  if (techSupply && webcam)   supplierProductLinks.push({ supplierId: techSupply.id, productId: webcam.id })
+  if (techSupply && stand)    supplierProductLinks.push({ supplierId: techSupply.id, productId: stand.id })
+
+  if (globalElectronics && keyboard) supplierProductLinks.push({ supplierId: globalElectronics.id, productId: keyboard.id })
+  if (globalElectronics && hub)      supplierProductLinks.push({ supplierId: globalElectronics.id, productId: hub.id })
+  if (globalElectronics && webcam)   supplierProductLinks.push({ supplierId: globalElectronics.id, productId: webcam.id })
+
+  if (furnitureWorld && chair) supplierProductLinks.push({ supplierId: furnitureWorld.id, productId: chair.id })
+  if (furnitureWorld && desk)  supplierProductLinks.push({ supplierId: furnitureWorld.id, productId: desk.id })
+  if (furnitureWorld && stand) supplierProductLinks.push({ supplierId: furnitureWorld.id, productId: stand.id })
+
+  if (officeEssentials && lamp)     supplierProductLinks.push({ supplierId: officeEssentials.id, productId: lamp.id })
+  if (officeEssentials && notebook) supplierProductLinks.push({ supplierId: officeEssentials.id, productId: notebook.id })
+
+  for (const link of supplierProductLinks) {
+    await prisma.supplierProduct.upsert({
+      where: {
+        supplierId_productId: {
+          supplierId: link.supplierId,
+          productId: link.productId,
+        },
+      },
+      update: {},
+      create: link,
+    })
+  }
+  console.log("Upserted", supplierProductLinks.length, "supplier-product links")
+
   console.log("Seed completed successfully!")
 }
 

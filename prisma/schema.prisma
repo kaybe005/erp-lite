@@ -54,22 +54,37 @@ model Product {
   updatedAt          DateTime            @updatedAt
   purchaseOrderItems PurchaseOrderItem[]
   salesOrderItems    SalesOrderItem[]
+  supplierProducts   SupplierProduct[]
 
   @@map("products")
 }
 
 model Supplier {
-  id             String          @id @default(cuid())
-  companyName    String
-  contactName    String
-  email          String?
-  phone          String?
-  address        String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  purchaseOrders PurchaseOrder[]
+  id               String            @id @default(cuid())
+  companyName      String
+  contactName      String
+  email            String?
+  phone            String?
+  address          String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  purchaseOrders   PurchaseOrder[]
+  supplierProducts SupplierProduct[]
 
   @@map("suppliers")
+}
+
+model SupplierProduct {
+  id         String   @id @default(cuid())
+  supplierId String
+  productId  String
+  createdAt  DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([supplierId, productId])
+  @@map("supplier_products")
 }
 
 model PurchaseOrder {
