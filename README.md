@@ -1,136 +1,262 @@
-# 🚀 ERP Lite — Full-Stack Dockerized Business Management System
+<div align="center">
 
-A modern, production-ready **ERP (Enterprise Resource Planning) Lite application** built with **Next.js, Prisma, PostgreSQL**, and fully containerized using **Docker & Docker Compose**.
+# ERP Lite
 
-Designed to simulate real-world business workflows including inventory, suppliers, and order lifecycle — while showcasing **full-stack + DevOps engineering practices**.
+**A production-grade, full-stack Business Management System**
 
----
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Prisma](https://img.shields.io/badge/Prisma-5.10-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 
-## ✨ Highlights
+A lightweight ERP for small and medium businesses — built with modern full-stack engineering practices and containerised for production-style deployment.
 
-- 🔐 Authentication system (NextAuth)
-- 📦 Product & supplier management
-- 🧾 Order lifecycle (create → reserve → dispatch → cancel)
-- ⚠️ Low-stock alert system
-- 🧠 Clean Prisma schema & relational data modeling
-- 🐳 Fully Dockerized (App + DB)
-- ⚙️ Production-style migration & seeding flow
+[Features](#-features) · [Tech Stack](#-tech-stack) · [Getting Started](#-getting-started) · [Architecture](#-architecture) · [API Reference](#-api-reference) · [Author](#-author)
 
----
-
-## 🛠️ Tech Stack
-
-| Layer        | Technology |
-|-------------|-----------|
-| Frontend    | Next.js (App Router) |
-| Backend     | Next.js API Routes |
-| Database    | PostgreSQL |
-| ORM         | Prisma |
-| Auth        | NextAuth |
-| DevOps      | Docker, Docker Compose |
-| Styling     | Tailwind CSS |
+</div>
 
 ---
 
-## 🏗️ Architecture
-Client (Browser)
-↓
-Next.js App (Container)
-↓
+## Features
+
+### Inventory & Products
+- Full product CRUD with SKU, category, unit price, stock quantity, and reorder level
+- **Reorder List** — automatically surfaces products at or below their reorder threshold, showing current stock, shortage quantity, and linked suppliers
+- Supplier–product linking: assign multiple suppliers to each product via a many-to-many relationship; only linked suppliers appear in purchase order dropdowns
+
+### Supplier Management
+- Supplier directory with contact details (name, email, phone, address)
+- Supplier–product relationship management — configure which products each supplier can supply, enforced at both the UI and API levels
+
+### Purchase Orders
+- Create purchase orders scoped to a supplier's linked products only — invalid supplier–product combinations are rejected inside a Prisma transaction with a clear error message
+- One-click reorder from the Reorder List pre-fills the supplier and product automatically
+- Order lifecycle: **Pending → Received → Cancelled**
+
+### Sales Orders
+- Create sales orders with multiple line items; stock is automatically decremented on confirmation
+- Customer name, order date, notes, and per-item pricing
+
+### Analytics Dashboard
+- **Revenue vs Costs** — 6-month area chart (confirmed sales vs non-cancelled purchase orders)
+- **Top Products by Revenue** — ranked leaderboard with proportional progress bars
+- **Order Overview** — live counts for pending POs, confirmed SOs, and low-stock items
+- 30-day KPI cards with month-over-month revenue trend
+
+### Platform
+- **Dark / light mode** — system-aware by default, toggle persisted per user, smooth 150ms transitions across the entire UI
+- **Command Palette** (⌘K / Ctrl+K) — navigate to any page or trigger quick actions from anywhere in the app
+- **Role-based access control** — Admin and Staff roles; the Users page is restricted to Admins
+- **Inventory Insights card** on the dashboard — rule-based alerts for low stock, unlinked products, and healthy states
+- Glassmorphism header with backdrop blur, collapsible sidebar, responsive layout
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| Language | TypeScript 5.7 (strict) |
+| Database | PostgreSQL 16 |
+| ORM | Prisma 5.10 with Neon serverless adapter |
+| Auth | NextAuth v4 (credentials provider, bcrypt) |
+| Styling | Tailwind CSS v4, OKLch design tokens |
+| Components | Radix UI primitives + shadcn/ui |
+| Charts | Recharts 2.15 |
+| Data Fetching | SWR |
+| Forms | React Hook Form + Zod |
+| Notifications | Sonner |
+| Theme | next-themes |
+| Containerisation | Docker + Docker Compose |
+| Analytics | Vercel Analytics |
+
+---
+
+## Architecture
+
+```
+Browser
+  │
+  ▼
+Next.js App Router  (SSR + Client Components)
+  │  ├── /app/(dashboard)/*        Protected pages
+  │  ├── /app/api/*                REST API route handlers
+  │  └── /components/*             UI component library
+  │
+  ▼
+Service Layer  (services/*.service.ts)
+  │  ├── ProductService
+  │  ├── SupplierService
+  │  ├── PurchaseOrderService      enforces supplier-product constraints
+  │  ├── SalesOrderService
+  │  ├── DashboardService
+  │  └── AnalyticsService
+  │
+  ▼
 Prisma ORM
-↓
-PostgreSQL (Container)
+  │
+  ▼
+PostgreSQL  (Docker container / Neon serverless)
+```
 
-- Services are isolated via Docker
-- Communication via internal Docker network
-- Environment-based configuration
+### Key Design Decisions
+
+- **Supplier–product enforcement at two levels.** The UI filters product dropdowns to only show items linked to the selected supplier. `PurchaseOrderService` validates the same constraint inside a Prisma transaction before writing — so even direct API calls cannot bypass it.
+- **Service layer pattern.** All database logic lives in `services/`, keeping API route handlers thin and making business logic independently testable.
+- **SWR for client data.** Stale-while-revalidate keeps the UI snappy without prop drilling or global state management.
+- **Prisma migrations via `migrate deploy`.** Migrations are applied with the production command (not `migrate dev`), mirroring a real deployment pipeline.
 
 ---
 
-## ⚡ Getting Started (Local Setup)
+## Database Schema
 
-### 1. Clone the repository
+```
+User ──< PurchaseOrder ──< PurchaseOrderItem >── Product
+User ──< SalesOrder    ──< SalesOrderItem    >── Product
+Supplier ──< PurchaseOrder
+Supplier ──< SupplierProduct >── Product          (junction table)
+```
+
+Core models: `User`, `Product`, `Supplier`, `SupplierProduct`, `PurchaseOrder`, `PurchaseOrderItem`, `SalesOrder`, `SalesOrderItem`
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- [Docker](https://www.docker.com/get-started) and Docker Compose
+- Node.js 20+ (for local development without Docker)
+
+---
+
+### Option A — Docker (recommended)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/erp-lite.git
+# 1. Clone
+git clone https://github.com/kaybe005/erp-lite.git
 cd erp-lite
-```
 
-### 2. Setup environment variables
-```bash
+# 2. Configure environment
 cp .env.example .env
-```
-Update values if needed.
+# Edit .env if needed — defaults work out of the box with Docker
 
----
-### 3. Start database
-```bash
+# 3. Start the database
 docker compose up -d db
-```
----
 
-### 4. Apply database schema
-```bash
+# 4. Apply schema migrations
 docker compose run --rm app npm run db:migrate:deploy
-```
----
 
-### 5. Seed initial data
-```bash
-docker compose run --rm app npm db:seed
-```
----
+# 5. Seed initial data
+docker compose run --rm app npm run db:seed
 
-### 6. Start the application
-```bash
+# 6. Start the app
 docker compose up --build app
 ```
+
+Open [http://localhost:3000](http://localhost:3000)
+
 ---
 
-### 7. Open in browser
+### Option B — Local development
+
 ```bash
-http://localhost:3000
+# 1. Clone and install
+git clone https://github.com/kaybe005/erp-lite.git
+cd erp-lite
+npm install
+
+# 2. Configure environment
+cp .env.example .env
+# Set DATABASE_URL to your local PostgreSQL instance
+
+# 3. Apply schema and seed
+npx prisma migrate deploy
+npx prisma db seed
+
+# 4. Start dev server
+npm run dev
 ```
----
 
-
-### 🔑 Default Credentials (Seeded)
-| Role	        |  Email       |
-| ----------|-----------|
-| Admin	    |   admin@erplite.com|
-|Staff	|staff@erplite.com|
-
-(Passwords defined in seed script)
+Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## 🐳 Docker Overview
-### Services
-- app → Next.js application
-- db → PostgreSQL database
-### Key Concepts
-- Multi-stage Docker build (optimized image)
-- .dockerignore used to reduce build size
-- Environment variables injected at runtime
-- Prisma migrations run separately (clean DevOps flow)
+### Default Credentials
+
+| Role  | Email |
+|-------|-------|
+| Admin | admin@erplite.com |
+| Staff | staff@erplite.com |
+
+Passwords are defined in `prisma/seed.ts`.
+
 ---
 
-## 🧠 DevOps Workflow
+### Useful Scripts
+
 ```bash
-Start DB → Apply Migrations → Seed Data → Run App
+npm run dev                   # Start dev server (Turbopack)
+npm run build                 # Production build
+npm run db:migrate            # Create and apply a new migration
+npm run db:migrate:deploy     # Apply existing migrations (production)
+npm run db:seed               # Seed the database with sample data
+npm run db:push               # Push schema without a migration file (dev only)
+npm run lint                  # Run ESLint
 ```
-This mimics real production deployment pipelines.
 
 ---
-## 📁 Project Structure
-```bash
+
+## Project Structure
+
+```
 erp-lite/
-├── app/                
-├── components/         
-├── lib/                
-├── prisma/             
-├── public/             
-├── services/           
+├── app/
+│   ├── (auth)/                    # Login page
+│   ├── (dashboard)/               # Protected app pages
+│   │   ├── dashboard/             # Overview + inventory insights
+│   │   ├── analytics/             # Revenue, costs, top products
+│   │   ├── products/              # Product CRUD
+│   │   ├── reorder/               # Reorder list
+│   │   ├── suppliers/             # Supplier CRUD
+│   │   ├── purchase-orders/       # PO management
+│   │   ├── sales-orders/          # SO management
+│   │   └── users/                 # User management (Admin only)
+│   └── api/                       # REST API route handlers
+│       ├── analytics/
+│       ├── dashboard/
+│       ├── products/
+│       │   ├── [id]/suppliers/    # Supplier–product link management
+│       │   └── low-stock/
+│       ├── suppliers/
+│       │   └── [id]/products/
+│       ├── purchase-orders/
+│       ├── sales-orders/
+│       └── users/
+├── components/
+│   ├── dashboard/                 # StatsCard, RecentOrders
+│   ├── layout/                    # Sidebar, Header, PageWrapper, CommandPalette
+│   ├── products/                  # ProductForm (with supplier multi-select)
+│   ├── purchase-orders/           # PurchaseOrderForm
+│   ├── sales-orders/
+│   ├── suppliers/
+│   ├── users/
+│   └── ui/                        # shadcn/ui component library
+├── services/                      # Business logic layer
+│   ├── analytics.service.ts
+│   ├── dashboard.service.ts
+│   ├── product.service.ts
+│   ├── purchase-order.service.ts
+│   ├── sales-order.service.ts
+│   └── supplier.service.ts
+├── lib/                           # Auth config, DB client, Zod schemas, utils
+├── prisma/
+│   ├── schema.prisma
+│   ├── migrations/
+│   └── seed.ts
 ├── Dockerfile
 ├── compose.yaml
 └── .env.example
@@ -138,33 +264,56 @@ erp-lite/
 
 ---
 
-### ⚠️ Notes
-- .env is required (not committed for security)
-- Seed script uses upsert → safe to run multiple times
-- Prisma migrations must be applied before running the app
+## API Reference
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/dashboard` | Dashboard stats (counts, recent orders) |
+| GET | `/api/analytics` | Revenue trend, top products, KPI summary |
+| GET / POST | `/api/products` | List / create products |
+| GET / PUT / DELETE | `/api/products/[id]` | Get / update / delete a product |
+| GET | `/api/products/low-stock` | Products at or below reorder level |
+| GET / PUT | `/api/products/[id]/suppliers` | Get / sync supplier links for a product |
+| GET / POST | `/api/suppliers` | List / create suppliers |
+| GET / PUT / DELETE | `/api/suppliers/[id]` | Get / update / delete a supplier |
+| GET | `/api/suppliers/[id]/products` | Products linked to a supplier |
+| GET / POST | `/api/purchase-orders` | List / create purchase orders |
+| GET / PATCH | `/api/purchase-orders/[id]` | Get / update PO status |
+| GET / POST | `/api/sales-orders` | List / create sales orders |
+| GET / PATCH | `/api/sales-orders/[id]` | Get / update SO status |
+| GET / POST | `/api/users` | List / create users (Admin only) |
+| PATCH / DELETE | `/api/users/[id]` | Update / deactivate a user |
+
+All routes require an authenticated session. Role-restricted routes return `403` for non-Admin users.
+
 ---
-### 📈 Future Improvements
-- 🔒 Role-based access control (RBAC)
-- 📊 Dashboard analytics
-- 🌐 CI/CD pipeline (GitHub Actions)
-- ⚡ Performance optimization
-- ☁️ Cloud-native deployment (ECS / Kubernetes)
+
+## Docker Overview
+
+```yaml
+services:
+  app:   # Next.js application (multi-stage build)
+  db:    # PostgreSQL 16
+```
+
+- **Multi-stage `Dockerfile`** — a builder stage compiles the app; the runner stage copies only the `.next` output for a minimal production image
+- Services communicate over an internal Docker bridge network
+- Environment variables injected at runtime via `.env`
+- Migrations and seeding run as separate one-off commands (not baked into the startup process) — mirrors real-world deployment pipelines
+
 ---
 
-## 👨‍💻 Author
+## Author
 
-### Kalash Bijukchhe
+**Kalash Bijukchhe**
 
-🌐 https://kalashbijukchhe.com
-- 💼 Aspiring Full-Stack / DevOps Engineer
-- 🚀 Focus: Scalable systems, FinTech, Cloud Engineering
+- 🌐 [kalashbijukchhe.com](https://kalashbijukchhe.com)
+- 💼 Full-Stack & DevOps Engineer — scalable systems, FinTech, cloud-native architecture
+
 ---
 
-### ⭐ Final Note
+<div align="center">
 
-This project demonstrates:
+If this project was useful, a ⭐ is appreciated.
 
-- real-world system design
-- containerized architecture
-- database lifecycle management
-- production-style workflows
+</div>
