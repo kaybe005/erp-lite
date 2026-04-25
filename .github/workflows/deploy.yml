@@ -1,0 +1,52 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy ERP app to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/ec2_key
+          chmod 600 ~/.ssh/ec2_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy container on EC2
+        run: |
+          ssh -i ~/.ssh/ec2_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+
+            docker pull ghcr.io/kaybe005/erp-lite:latest
+
+            docker run --rm \
+              --network erp-net \
+              -e DATABASE_URL='${{ secrets.DATABASE_URL }}' \
+              ghcr.io/kaybe005/erp-lite:latest \
+              npm run db:migrate:deploy
+
+            docker rm -f erp-lite-app || true
+
+            docker run -d \
+              --name erp-lite-app \
+              --network erp-net \
+              --restart unless-stopped \
+              -p 80:3000 \
+              -e DATABASE_URL='${{ secrets.DATABASE_URL }}' \
+              -e NEXTAUTH_SECRET='${{ secrets.NEXTAUTH_SECRET }}' \
+              -e NEXTAUTH_URL='${{ secrets.NEXTAUTH_URL }}' \
+              ghcr.io/kaybe005/erp-lite:latest
+
+            docker ps
+          EOF
