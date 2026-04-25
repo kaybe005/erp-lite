@@ -31,3 +31,6 @@ jobs:
 
       - name: Build Next.js app
         run: npm run build
+
+      - name: Build Docker image
+        run: docker build -t erp-lite:ci .
