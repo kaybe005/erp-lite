@@ -1,0 +1,25 @@
+namespace: dev
+
+image:
+  repository: ghcr.io/kaybe005/erp-lite
+  tag: dev
+  pullPolicy: Always
+
+app:
+  name: erp-app
+  replicas: 1
+  port: 3000
+
+ingress:
+  enabled: true
+  className: traefik
+  host: erp-dev.home.lab
+
+postgres:
+  name: erp-postgres
+  image: postgres:16
+  database: erp_lite
+  user: erp_user
+  password: erp_password
+  port: 5432
+  storage: 5Gi
