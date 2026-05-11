@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 env:
@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -43,3 +45,14 @@ jobs:
           tags: |
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.IMAGE_NAME }}:dev
+
+      - name: Update Helm image tag
+        run: |
+          sed -i "s/tag: .*/tag: ${{ github.sha }}/" helm/erp-lite/values.yaml
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add helm/erp-lite/values.yaml
+          git commit -m "Update ERP image tag to ${{ github.sha }} [skip ci]" || echo "No changes to commit"
+          git push
