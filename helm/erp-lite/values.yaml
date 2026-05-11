@@ -22,4 +22,4 @@ postgres:
   user: erp_user
   password: erp_password
   port: 5432
-  storage: 5Gi
+  storage: 2Gi
