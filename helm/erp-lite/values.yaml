@@ -2,7 +2,7 @@ namespace: dev
 
 image:
   repository: ghcr.io/kaybe005/erp-lite
-  tag: 742bdc173c3882e30bef6fa269383d736a41e0ff
+  tag: cce05f3b11f48d7006601ce4a9fb43d1d819449b
   pullPolicy: Always
 
 app:
