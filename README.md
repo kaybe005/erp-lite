@@ -1,319 +1,579 @@
-<div align="center">
+# ERP Lite — GitOps Homelab Deployment
 
-# ERP Lite
+ERP Lite is a full-stack ERP-style inventory and order management application deployed through a homelab GitOps workflow. The application itself is built with Next.js, React, TypeScript, Prisma, NextAuth, and PostgreSQL. The platform side demonstrates container builds, immutable image tagging, Kubernetes manifests through Helm, ArgoCD reconciliation, Traefik ingress, TLS, persistent storage, and cluster observability.
 
-**A production-grade, full-stack Business Management System**
+This is a **homelab production-style workflow**, not a high-availability production system. The deployment runs on a single-node k3s cluster in a Proxmox VM and is intended to show practical DevOps/platform engineering readiness: CI/CD, GitOps, Kubernetes operations, debugging, persistence, TLS, and observability.
 
-[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Prisma](https://img.shields.io/badge/Prisma-5.10-2D3748?style=flat-square&logo=prisma)](https://www.prisma.io)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+## Overview
 
-A lightweight ERP for small and medium businesses — built with modern full-stack engineering practices and containerised for production-style deployment.
+ERP Lite started as a normal full-stack web app and evolved into a platform deployment project. The repository now contains:
 
-[Features](#-features) · [Tech Stack](#-tech-stack) · [Getting Started](#-getting-started) · [Architecture](#-architecture) · [API Reference](#-api-reference) · [Author](#-author)
+| Area | Implementation |
+| --- | --- |
+| Application | Next.js App Router, React, TypeScript, server/client components, REST API route handlers |
+| Data layer | Prisma schema, migrations, seed data, PostgreSQL |
+| Authentication | NextAuth credentials provider with bcrypt password hashing and JWT sessions |
+| Containerization | Multi-stage Dockerfile and Docker Compose for local development |
+| CI/CD | GitHub Actions workflow that builds and pushes AMD64 images to GHCR |
+| Deployment | Helm chart for app, PostgreSQL, services, ingress, PVC, and probes |
+| GitOps | ArgoCD Application manifest targeting the Helm chart |
+| Homelab platform | k3s, Traefik, cert-manager, Prometheus/Grafana, AdGuard DNS, Proxmox |
 
-</div>
+The goal is to make the deployment path explicit:
 
----
+```text
+code change -> GitHub Actions -> GHCR image -> Helm values update -> ArgoCD sync -> k3s rollout
+```
 
-## Features
+## Why This Project Exists
 
-### Inventory & Products
-- Full product CRUD with SKU, category, unit price, stock quantity, and reorder level
-- **Reorder List** — automatically surfaces products at or below their reorder threshold, showing current stock, shortage quantity, and linked suppliers
-- Supplier–product linking: assign multiple suppliers to each product via a many-to-many relationship; only linked suppliers appear in purchase order dropdowns
+The purpose of this project is to move beyond "I containerized a web app" and build a realistic internal platform workflow around it. ERP Lite is intentionally small enough to understand end to end, but broad enough to demonstrate the kind of operational work expected from junior DevOps, platform, cloud, or infrastructure engineers.
 
-### Supplier Management
-- Supplier directory with contact details (name, email, phone, address)
-- Supplier–product relationship management — configure which products each supplier can supply, enforced at both the UI and API levels
+The project demonstrates:
 
-### Purchase Orders
-- Create purchase orders scoped to a supplier's linked products only — invalid supplier–product combinations are rejected inside a Prisma transaction with a clear error message
-- One-click reorder from the Reorder List pre-fills the supplier and product automatically
-- Order lifecycle: **Pending → Received → Cancelled**
-
-### Sales Orders
-- Create sales orders with multiple line items; stock is automatically decremented on confirmation
-- Customer name, order date, notes, and per-item pricing
-
-### Analytics Dashboard
-- **Revenue vs Costs** — 6-month area chart (confirmed sales vs non-cancelled purchase orders)
-- **Top Products by Revenue** — ranked leaderboard with proportional progress bars
-- **Order Overview** — live counts for pending POs, confirmed SOs, and low-stock items
-- 30-day KPI cards with month-over-month revenue trend
-
-### Platform
-- **Dark / light mode** — system-aware by default, toggle persisted per user, smooth 150ms transitions across the entire UI
-- **Command Palette** (⌘K / Ctrl+K) — navigate to any page or trigger quick actions from anywhere in the app
-- **Role-based access control** — Admin and Staff roles; the Users page is restricted to Admins
-- **Inventory Insights card** on the dashboard — rule-based alerts for low stock, unlinked products, and healthy states
-- Glassmorphism header with backdrop blur, collapsible sidebar, responsive layout
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Language | TypeScript 5.7 (strict) |
-| Database | PostgreSQL 16 |
-| ORM | Prisma 5.10 with Neon serverless adapter |
-| Auth | NextAuth v4 (credentials provider, bcrypt) |
-| Styling | Tailwind CSS v4, OKLch design tokens |
-| Components | Radix UI primitives + shadcn/ui |
-| Charts | Recharts 2.15 |
-| Data Fetching | SWR |
-| Forms | React Hook Form + Zod |
-| Notifications | Sonner |
-| Theme | next-themes |
-| Containerisation | Docker + Docker Compose |
-| Analytics | Vercel Analytics |
-
----
+- Building and running a database-backed web app locally and in Kubernetes.
+- Handling container architecture mismatches between Apple Silicon development machines and AMD64 Linux nodes.
+- Publishing container images to a registry and deploying by immutable Git SHA tags.
+- Managing Kubernetes resources through Helm rather than one-off YAML.
+- Using ArgoCD as the deployment controller and Git as the desired-state source.
+- Exposing internal services through Traefik ingress and internal TLS.
+- Keeping PostgreSQL internal-only with persistent storage.
+- Debugging real operational issues around image pulls, DNS, storage drift, migrations, and observability.
 
 ## Architecture
 
-```
-Browser
-  │
-  ▼
-Next.js App Router  (SSR + Client Components)
-  │  ├── /app/(dashboard)/*        Protected pages
-  │  ├── /app/api/*                REST API route handlers
-  │  └── /components/*             UI component library
-  │
-  ▼
-Service Layer  (services/*.service.ts)
-  │  ├── ProductService
-  │  ├── SupplierService
-  │  ├── PurchaseOrderService      enforces supplier-product constraints
-  │  ├── SalesOrderService
-  │  ├── DashboardService
-  │  └── AnalyticsService
-  │
-  ▼
-Prisma ORM
-  │
-  ▼
-PostgreSQL  (Docker container / Neon serverless)
+### CI/CD and GitOps Flow
+
+```mermaid
+flowchart LR
+    Dev["Developer push<br/>MacBook Air M2"] --> Repo["GitHub repository<br/>main branch"]
+    Repo --> Actions["GitHub Actions<br/>docker-ghcr.yml"]
+    Actions --> Buildx["Docker Buildx<br/>platform: linux/amd64"]
+    Buildx --> GHCR["GHCR<br/>ghcr.io/kaybe005/erp-lite"]
+    Actions --> Values["Update Helm image tag<br/>helm/erp-lite/values.yaml"]
+    Values --> Repo
+    Repo --> Argo["ArgoCD Application<br/>erp-lite-dev"]
+    Argo --> Helm["Helm chart render<br/>helm/erp-lite"]
+    Helm --> K3s["k3s namespace: dev"]
+    K3s --> App["erp-app Deployment"]
+    K3s --> Pg["erp-postgres Deployment + PVC"]
+    App --> Pg
 ```
 
-### Key Design Decisions
+The active workflow builds two image tags:
 
-- **Supplier–product enforcement at two levels.** The UI filters product dropdowns to only show items linked to the selected supplier. `PurchaseOrderService` validates the same constraint inside a Prisma transaction before writing — so even direct API calls cannot bypass it.
-- **Service layer pattern.** All database logic lives in `services/`, keeping API route handlers thin and making business logic independently testable.
-- **SWR for client data.** Stale-while-revalidate keeps the UI snappy without prop drilling or global state management.
-- **Prisma migrations via `migrate deploy`.** Migrations are applied with the production command (not `migrate dev`), mirroring a real deployment pipeline.
+- `${{ github.sha }}`: immutable deployment tag used by Helm.
+- `dev`: mutable convenience tag for quick inspection.
 
----
+The Helm chart currently deploys the immutable SHA tag from `helm/erp-lite/values.yaml`.
 
-## Database Schema
+### Runtime Traffic Flow
 
+```mermaid
+flowchart LR
+    Browser["Browser<br/>https://erp-dev.home.lab"] --> DNS["AdGuard Home<br/>DNS rewrite"]
+    DNS --> Node["k3s node IP"]
+    Node --> Traefik["Traefik Ingress Controller"]
+    Traefik --> Ingress["Ingress<br/>host: erp-dev.home.lab<br/>TLS secret: erp-dev-tls-secret"]
+    Ingress --> AppSvc["erp-app Service<br/>ClusterIP:80"]
+    AppSvc --> AppPod["erp-app Pod<br/>Next.js :3000"]
+    AppPod --> PgSvc["erp-postgres Service<br/>ClusterIP:5432"]
+    PgSvc --> PgPod["erp-postgres Pod"]
+    PgPod --> PVC["PersistentVolumeClaim<br/>erp-postgres-pvc"]
 ```
-User ──< PurchaseOrder ──< PurchaseOrderItem >── Product
-User ──< SalesOrder    ──< SalesOrderItem    >── Product
-Supplier ──< PurchaseOrder
-Supplier ──< SupplierProduct >── Product          (junction table)
+
+PostgreSQL is not exposed outside the cluster. The only external application entrypoint is the Traefik ingress host.
+
+### GitOps Reconciliation Flow
+
+```mermaid
+sequenceDiagram
+    participant Git as GitHub repo
+    participant CI as GitHub Actions
+    participant Reg as GHCR
+    participant Argo as ArgoCD
+    participant K8s as k3s cluster
+
+    Git->>CI: Push to main
+    CI->>Reg: Build and push linux/amd64 image
+    CI->>Git: Commit Helm image tag update
+    Argo->>Git: Poll/watch desired state
+    Argo->>K8s: Apply Helm-rendered manifests
+    K8s->>Reg: Pull immutable image tag
+    K8s->>K8s: Roll out Deployment and reconcile resources
 ```
 
-Core models: `User`, `Product`, `Supplier`, `SupplierProduct`, `PurchaseOrder`, `PurchaseOrderItem`, `SalesOrder`, `SalesOrderItem`
+### Repository vs Homelab Platform
 
----
+Some platform components are installed in the cluster but are not currently managed by this repository.
 
-## Getting Started
+| Component | In this repo? | Notes |
+| --- | --- | --- |
+| ERP app Dockerfile | Yes | Multi-stage Node image for Next.js |
+| GitHub Actions GHCR build | Yes | Builds `linux/amd64` and updates Helm tag |
+| Helm chart | Yes | App, Postgres, PVC, Services, Ingress, probes, namespace |
+| ArgoCD Application | Yes | `argocd/erp-lite-dev.yaml` |
+| Traefik ingress controller | No | Installed as cluster platform component |
+| cert-manager | No | Installed in cluster; Ingress references `erp-dev-tls-secret` |
+| ClusterIssuer/Certificate manifests | No | Created during homelab setup; good future GitOps addition |
+| Prometheus/Grafana stack | No | Installed as cluster platform component |
+| Loki/Promtail | No | Explored, but log ingestion is not finalized in this repo |
 
-### Prerequisites
+## Tech Stack
 
-- [Docker](https://www.docker.com/get-started) and Docker Compose
-- Node.js 20+ (for local development without Docker)
+| Category | Tools |
+| --- | --- |
+| Application | Next.js 16 App Router, React 19, TypeScript 5.7, SWR |
+| UI | Tailwind CSS v4, Radix UI primitives, shadcn-style components, lucide-react, Recharts |
+| Auth | NextAuth v4 credentials provider, bcryptjs, JWT sessions |
+| Database | PostgreSQL 16, Prisma ORM 5.10, Prisma migrations and seed data |
+| Containerization | Docker, multi-stage Dockerfile, Docker Compose |
+| CI/CD | GitHub Actions, Docker Buildx, GHCR |
+| Kubernetes/GitOps | k3s, Helm, ArgoCD |
+| Networking/TLS | Traefik ingress, cert-manager, self-signed/internal TLS, AdGuard DNS rewrites |
+| Observability | Prometheus and Grafana installed in the homelab cluster |
+| Homelab infrastructure | Dell OptiPlex 7080, Proxmox, single-node k3s VM, MacBook Air M2 development machine |
 
----
+## Application Features
 
-### Option A — Docker (recommended)
+These features are present in the repository code.
+
+### Authentication and Access Control
+
+- Credentials-based login with NextAuth.
+- Password hashes generated with bcrypt.
+- JWT-backed sessions containing user ID and role.
+- `ADMIN` and `STAFF` roles in Prisma.
+- Protected dashboard layout that redirects unauthenticated users to `/login`.
+- Admin-only Users page and API routes.
+- User management logic prevents deleting/deactivating the last active admin.
+
+Demo users are seeded by `prisma/seed.ts`:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@erplite.com` | `admin123` |
+| Staff | `staff@erplite.com` | `staff123` |
+
+### Inventory and Products
+
+- Product CRUD with name, SKU, category, description, unit price, stock quantity, and reorder level.
+- Unique SKU enforcement.
+- Low-stock detection when `quantityInStock <= reorderLevel`.
+- Reorder list for products at or below their reorder threshold.
+- Product-to-supplier linking through the `SupplierProduct` junction table.
+- Product deletion is blocked when purchase or sales order history exists.
+
+### Suppliers
+
+- Supplier CRUD with company name, contact name, email, phone, and address.
+- Supplier deletion is blocked when purchase orders exist.
+- Supplier-product relationships are used to control which products can be ordered from each supplier.
+
+### Purchase Orders
+
+- Purchase orders contain one or more line items.
+- Purchase order statuses: `PENDING`, `RECEIVED`, `CANCELLED`.
+- Creating a purchase order validates that every product is linked to the selected supplier.
+- Validation happens inside a Prisma transaction, so direct API calls cannot bypass the rule.
+- Marking a pending purchase order as received increments product stock.
+- Cancelling a pending purchase order prevents receipt.
+- Reorder list can prefill purchase order creation for a selected low-stock product.
+
+### Sales Orders
+
+- Sales orders contain one or more line items.
+- Sales order statuses: `CONFIRMED`, `CANCELLED`.
+- Sales order creation checks stock availability before writing the order.
+- Confirmed sales decrement product stock inside a transaction.
+- Cancelling a confirmed sales order restores stock quantities.
+- Supports customer name or walk-in customer flow.
+
+### Dashboard and Analytics
+
+- Dashboard summary cards for products, suppliers, low-stock items, purchase orders, and sales orders.
+- Recent purchase and sales order panels.
+- Inventory insights for low-stock products and missing supplier links.
+- Analytics page with:
+  - 30-day revenue, cost, gross profit, and low-stock KPI cards.
+  - Six-month revenue vs costs chart.
+  - Top products by revenue.
+  - Order status snapshot.
+
+### UX and App Structure
+
+- Collapsible sidebar navigation.
+- Command palette for page navigation and quick actions.
+- Light/dark theme support through `next-themes`.
+- Reusable service layer in `services/*.service.ts`.
+- API route handlers under `app/api/*`.
+- Zod validation and Prisma-backed business rules with schemas in `lib/validations.ts`.
+
+## CI/CD Pipeline
+
+The active workflow is `.github/workflows/docker-ghcr.yml`.
+
+It runs on:
+
+- Pushes to `main`.
+- Manual `workflow_dispatch`.
+
+Pipeline steps:
+
+1. Check out the repository.
+2. Set up QEMU.
+3. Set up Docker Buildx.
+4. Log in to GitHub Container Registry using `GITHUB_TOKEN`.
+5. Build and push the Docker image for `linux/amd64`.
+6. Publish both immutable and mutable tags:
+   - `ghcr.io/kaybe005/erp-lite:${{ github.sha }}`
+   - `ghcr.io/kaybe005/erp-lite:dev`
+7. Update `helm/erp-lite/values.yaml` with the Git SHA image tag.
+8. Commit the Helm value change back to `main` with `[skip ci]`.
+
+The `linux/amd64` target is important because the development machine is Apple Silicon, but the k3s node runs on an AMD64 Dell OptiPlex. Without an explicit platform target, images built locally on the MacBook can be ARM64 and fail on the cluster node.
+
+The immutable Git SHA tag makes rollouts and rollbacks easier to reason about because the deployed image can be tied directly to a commit.
+
+Current CI caveat: the active workflow focuses on image build/push and Helm tag update. Automated tests, linting, and smoke checks are good next additions.
+
+## Kubernetes Deployment
+
+The Helm chart deploys into the `dev` namespace by default.
+
+| Resource | Name | Purpose |
+| --- | --- | --- |
+| Namespace | `dev` | Isolated namespace for ERP Lite |
+| Secret | `erp-app-secret` | App environment variables |
+| Deployment | `erp-app` | Next.js application pod |
+| Service | `erp-app` | Internal ClusterIP service on port 80 |
+| Ingress | `erp-app` | Traefik route for `erp-dev.home.lab` |
+| Secret | `erp-postgres-secret` | PostgreSQL environment variables |
+| Deployment | `erp-postgres` | PostgreSQL pod |
+| Service | `erp-postgres` | Internal ClusterIP service on port 5432 |
+| PVC | `erp-postgres-pvc` | Persistent PostgreSQL storage |
+
+The app Deployment includes:
+
+- One replica by default.
+- Image from GHCR.
+- `imagePullPolicy: Always`.
+- Container port `3000`.
+- Environment variables from `erp-app-secret`.
+- Readiness probe on `/`.
+- Liveness probe on `/`.
+
+PostgreSQL is exposed only through a ClusterIP service. It is reachable from the app pod but not directly from the LAN.
+
+Current Kubernetes caveats:
+
+- Secrets are templated in Helm for homelab simplicity. A stronger pattern would use External Secrets, Sealed Secrets, SOPS, or another secret management workflow.
+- Resource requests and limits are not yet defined.
+- NetworkPolicies are not yet defined.
+- PostgreSQL runs in-cluster for learning purposes; it is not a managed database service.
+
+## Helm Chart
+
+Chart location:
+
+```text
+helm/erp-lite/
+├── Chart.yaml
+├── values.yaml
+└── templates/
+    ├── namespace.yaml
+    ├── app.yaml
+    └── postgres.yaml
+```
+
+`values.yaml` controls:
+
+- Namespace.
+- App image repository, tag, and pull policy.
+- App name, replica count, and port.
+- Ingress enablement, class, and host.
+- PostgreSQL image, database name, user, password, port, and PVC size.
+
+Helm is used instead of raw YAML because the deployment has values that change over time, especially the image tag. It also keeps the app, database, service, ingress, and PVC definitions grouped as one deployable unit for ArgoCD.
+
+Render the chart locally:
 
 ```bash
-# 1. Clone
-git clone https://github.com/kaybe005/erp-lite.git
-cd erp-lite
+helm template erp-lite helm/erp-lite
+```
 
-# 2. Configure environment
+## ArgoCD GitOps
+
+ArgoCD is configured by:
+
+```text
+argocd/erp-lite-dev.yaml
+```
+
+The Application points to:
+
+- Repository: `https://github.com/kaybe005/erp-lite.git`
+- Branch: `main`
+- Path: `helm/erp-lite`
+- Destination namespace: `dev`
+
+The manifest enables:
+
+- Automated sync.
+- Prune.
+- Self-heal.
+- Namespace creation through `CreateNamespace=true`.
+
+This means the desired deployment state is stored in Git. Instead of manually applying Kubernetes YAML after every change, ArgoCD continuously reconciles the cluster back to what the Helm chart declares.
+
+Useful commands:
+
+```bash
+kubectl apply -f argocd/erp-lite-dev.yaml
+kubectl -n argocd get applications.argoproj.io erp-lite-dev
+kubectl -n dev get deploy,svc,ingress,pvc
+```
+
+## TLS and Ingress
+
+ERP Lite is exposed through Traefik:
+
+```text
+https://erp-dev.home.lab
+```
+
+The homelab uses:
+
+- AdGuard Home DNS rewrite: `erp-dev.home.lab -> k3s node IP`.
+- Traefik as the Kubernetes ingress controller.
+- cert-manager for certificate automation.
+- A self-signed/internal certificate for local TLS.
+
+The Helm Ingress references:
+
+```yaml
+tls:
+  - hosts:
+      - erp-dev.home.lab
+    secretName: erp-dev-tls-secret
+```
+
+The current repo does not include the cert-manager `ClusterIssuer` or `Certificate` manifests. Those were created during homelab setup and should be moved into GitOps as a future improvement.
+
+Because the certificate is internal/self-signed, browsers will show a trust warning unless the local CA is trusted on the client device. This is expected for the current homelab setup and is different from public Let's Encrypt TLS.
+
+## Database and Persistence
+
+PostgreSQL runs inside the `dev` namespace as `erp-postgres`.
+
+The database layer includes:
+
+- Prisma schema in `prisma/schema.prisma`.
+- Prisma migrations in `prisma/migrations/`.
+- Seed data in `prisma/seed.ts`.
+- PostgreSQL PVC: `erp-postgres-pvc`.
+
+The PVC allows database state to survive pod restarts and app rollouts. This was important during the homelab deployment because deleting/restarting pods should not wipe ERP data.
+
+Prisma migrations are currently a separate operational step. The app Deployment does not automatically run migrations before rollout.
+
+Manual migration commands used during setup:
+
+```bash
+kubectl -n dev exec deploy/erp-app -- npm run db:migrate:deploy
+kubectl -n dev exec deploy/erp-app -- npm run db:seed
+```
+
+Future improvement: add a Helm-managed Kubernetes Job or ArgoCD sync hook that runs `prisma migrate deploy` before the app rollout is considered complete. Seeding should remain explicit and environment-aware.
+
+## Observability
+
+The homelab cluster has Prometheus and Grafana installed through the monitoring stack. Grafana was exposed through ingress and used to inspect Kubernetes node, namespace, pod, and workload health.
+
+What is currently true:
+
+- Prometheus/Grafana are installed as cluster-level platform services.
+- kube-prometheus-stack dashboards were used for Kubernetes visibility.
+- ERP Lite does not yet include custom Prometheus metrics or ServiceMonitor manifests in this repo.
+- Loki/Promtail log collection was explored, but log ingestion is not finalized and is not claimed as complete here.
+
+Future observability work:
+
+- Add app-specific health and metrics endpoints.
+- Add ServiceMonitor/PodMonitor resources if the monitoring stack supports them.
+- Finalize Loki/Promtail or another log pipeline.
+- Add dashboard screenshots and runbook notes under `docs/`.
+
+## Key Problems Solved
+
+| Problem | Cause | Fix / lesson |
+| --- | --- | --- |
+| ARM64 image on AMD64 node | MacBook M2 builds ARM64 images by default | GitHub Actions now uses Docker Buildx with `platforms: linux/amd64` |
+| Docker CLI vs k3s runtime confusion | k3s uses containerd, not the local Docker daemon | Local Docker images are not automatically available to Kubernetes |
+| Manual image import did not scale | Early deployment relied on locally imported images | Moved to GHCR-based image pulls |
+| GHCR pulls blocked | Old manual deployment used `imagePullPolicy: Never` | Helm now uses `imagePullPolicy: Always` |
+| Image traceability | Mutable tags make rollouts hard to audit | Helm deploys immutable Git SHA image tags |
+| Raw YAML drift | Manual Kubernetes resources became hard to repeat | Migrated app and database resources into a Helm chart |
+| GitOps ownership | Manual `kubectl` changes were not the desired long-term workflow | ArgoCD Application now reconciles the Helm chart from Git |
+| PVC drift | Existing PVC size differed from Helm values | Matched Helm values to the existing PVC and learned stateful resource immutability constraints |
+| Missing database schema after rollout | App deployment and DB migrations are separate concerns | Ran `prisma migrate deploy` manually; future improvement is a migration Job or sync hook |
+| TLS setup | Internal apps still benefit from HTTPS | Added Traefik Ingress TLS using a cert-manager-created internal certificate secret |
+| DNS confusion | Old docker-prod VM and k3s VM caused routing ambiguity | Standardized AdGuard DNS rewrites to point `erp-dev.home.lab` and `grafana.home.lab` at the k3s node |
+| Grafana access issues | Credentials/service exposure needed debugging | Reset credentials, exposed Grafana through ingress, and verified Kubernetes dashboards |
+
+## Local Development
+
+Prerequisites:
+
+- Node.js 20+ or 22+.
+- npm.
+- Docker or Docker Desktop.
+
+Set up local environment:
+
+```bash
 cp .env.example .env
-# Edit .env if needed — defaults work out of the box with Docker
-
-# 3. Start the database
 docker compose up -d db
-
-# 4. Apply schema migrations
-docker compose run --rm app npm run db:migrate:deploy
-
-# 5. Seed initial data
-docker compose run --rm app npm run db:seed
-
-# 6. Start the app
-docker compose up --build app
-```
-
-Open [http://localhost:3000](http://localhost:3000)
-
----
-
-### Option B — Local development
-
-```bash
-# 1. Clone and install
-git clone https://github.com/kaybe005/erp-lite.git
-cd erp-lite
 npm install
-
-# 2. Configure environment
-cp .env.example .env
-# Set DATABASE_URL to your local PostgreSQL instance
-
-# 3. Apply schema and seed
-npx prisma migrate deploy
-npx prisma db seed
-
-# 4. Start dev server
+npm run db:generate
+npm run db:migrate:deploy
+npm run db:seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open:
 
----
+```text
+http://localhost:3000
+```
 
-### Default Credentials
+The sample `.env.example` targets the Docker Compose database on localhost port `5433`.
 
-| Role  | Email |
-|-------|-------|
-| Admin | admin@erplite.com |
-| Staff | staff@erplite.com |
-
-Passwords are defined in `prisma/seed.ts`.
-
----
-
-### Useful Scripts
+Run the app with Docker Compose:
 
 ```bash
-npm run dev                   # Start dev server (Turbopack)
-npm run build                 # Production build
-npm run db:migrate            # Create and apply a new migration
-npm run db:migrate:deploy     # Apply existing migrations (production)
-npm run db:seed               # Seed the database with sample data
-npm run db:push               # Push schema without a migration file (dev only)
-npm run lint                  # Run ESLint
+docker compose up -d db
+docker compose run --rm app npm run db:migrate:deploy
+docker compose run --rm app npm run db:seed
+docker compose up --build app
 ```
 
----
+Useful scripts:
 
-## Project Structure
-
-```
-erp-lite/
-├── app/
-│   ├── (auth)/                    # Login page
-│   ├── (dashboard)/               # Protected app pages
-│   │   ├── dashboard/             # Overview + inventory insights
-│   │   ├── analytics/             # Revenue, costs, top products
-│   │   ├── products/              # Product CRUD
-│   │   ├── reorder/               # Reorder list
-│   │   ├── suppliers/             # Supplier CRUD
-│   │   ├── purchase-orders/       # PO management
-│   │   ├── sales-orders/          # SO management
-│   │   └── users/                 # User management (Admin only)
-│   └── api/                       # REST API route handlers
-│       ├── analytics/
-│       ├── dashboard/
-│       ├── products/
-│       │   ├── [id]/suppliers/    # Supplier–product link management
-│       │   └── low-stock/
-│       ├── suppliers/
-│       │   └── [id]/products/
-│       ├── purchase-orders/
-│       ├── sales-orders/
-│       └── users/
-├── components/
-│   ├── dashboard/                 # StatsCard, RecentOrders
-│   ├── layout/                    # Sidebar, Header, PageWrapper, CommandPalette
-│   ├── products/                  # ProductForm (with supplier multi-select)
-│   ├── purchase-orders/           # PurchaseOrderForm
-│   ├── sales-orders/
-│   ├── suppliers/
-│   ├── users/
-│   └── ui/                        # shadcn/ui component library
-├── services/                      # Business logic layer
-│   ├── analytics.service.ts
-│   ├── dashboard.service.ts
-│   ├── product.service.ts
-│   ├── purchase-order.service.ts
-│   ├── sales-order.service.ts
-│   └── supplier.service.ts
-├── lib/                           # Auth config, DB client, Zod schemas, utils
-├── prisma/
-│   ├── schema.prisma
-│   ├── migrations/
-│   └── seed.ts
-├── Dockerfile
-├── compose.yaml
-└── .env.example
+```bash
+npm run dev                 # Start Next.js dev server
+npm run build               # Generate Prisma client and build Next.js
+npm run start               # Start production Next.js server
+npm run db:generate         # Generate Prisma client
+npm run db:migrate          # Create/apply a dev migration
+npm run db:migrate:deploy   # Apply existing migrations
+npm run db:seed             # Seed demo users/products/suppliers
+npm run db:push             # Push schema in development only
 ```
 
----
+## Homelab Deployment
 
-## API Reference
+The homelab deployment target is a single-node k3s cluster running in a Proxmox VM on a Dell OptiPlex 7080.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/dashboard` | Dashboard stats (counts, recent orders) |
-| GET | `/api/analytics` | Revenue trend, top products, KPI summary |
-| GET / POST | `/api/products` | List / create products |
-| GET / PUT / DELETE | `/api/products/[id]` | Get / update / delete a product |
-| GET | `/api/products/low-stock` | Products at or below reorder level |
-| GET / PUT | `/api/products/[id]/suppliers` | Get / sync supplier links for a product |
-| GET / POST | `/api/suppliers` | List / create suppliers |
-| GET / PUT / DELETE | `/api/suppliers/[id]` | Get / update / delete a supplier |
-| GET | `/api/suppliers/[id]/products` | Products linked to a supplier |
-| GET / POST | `/api/purchase-orders` | List / create purchase orders |
-| GET / PATCH | `/api/purchase-orders/[id]` | Get / update PO status |
-| GET / POST | `/api/sales-orders` | List / create sales orders |
-| GET / PATCH | `/api/sales-orders/[id]` | Get / update SO status |
-| GET / POST | `/api/users` | List / create users (Admin only) |
-| PATCH / DELETE | `/api/users/[id]` | Update / deactivate a user |
+Approximate deployment flow:
 
-All routes require an authenticated session. Role-restricted routes return `403` for non-Admin users.
+1. Commit and push application changes to `main`.
+2. GitHub Actions builds a `linux/amd64` image with Docker Buildx.
+3. GitHub Actions pushes the image to GHCR.
+4. GitHub Actions updates `helm/erp-lite/values.yaml` with the immutable commit SHA.
+5. ArgoCD detects the Helm chart change.
+6. ArgoCD syncs the app into the `dev` namespace.
+7. k3s pulls the image from GHCR and rolls out `erp-app`.
+8. Manual Prisma migrations are run when schema changes are introduced.
+9. AdGuard DNS routes `erp-dev.home.lab` to the k3s node.
+10. Traefik routes HTTPS traffic to the app service.
 
----
+Useful cluster checks:
 
-## Docker Overview
-
-```yaml
-services:
-  app:   # Next.js application (multi-stage build)
-  db:    # PostgreSQL 16
+```bash
+kubectl -n dev get pods
+kubectl -n dev get deploy,svc,ingress,pvc
+kubectl -n dev describe ingress erp-app
+kubectl -n dev logs deploy/erp-app
+kubectl -n dev rollout status deploy/erp-app
 ```
 
-- **Multi-stage `Dockerfile`** — a builder stage compiles the app; the runner stage copies only the `.next` output for a minimal production image
-- Services communicate over an internal Docker bridge network
-- Environment variables injected at runtime via `.env`
-- Migrations and seeding run as separate one-off commands (not baked into the startup process) — mirrors real-world deployment pipelines
+Check the rendered image tag:
 
----
+```bash
+helm template erp-lite helm/erp-lite | grep "image:"
+```
 
-## Author
+Current secret note: the chart contains placeholder/simple secret values suitable for a homelab demonstration. A serious next step is moving secrets to Sealed Secrets, External Secrets, SOPS, or another GitOps-compatible secret workflow.
 
-**Kalash Bijukchhe**
+## Screenshots
 
-- 🌐 [kalashbijukchhe.com](https://kalashbijukchhe.com)
-- 💼 Full-Stack & DevOps Engineer — scalable systems, FinTech, cloud-native architecture
+Screenshots are not committed yet. Recommended placeholders:
 
----
+| Screenshot | Suggested path |
+| --- | --- |
+| ERP dashboard | `docs/screenshots/erp-dashboard.png` |
+| ArgoCD Synced/Healthy app | `docs/screenshots/argocd-erp-lite.png` |
+| Grafana Kubernetes dashboard | `docs/screenshots/grafana-kubernetes.png` |
+| Kubernetes resources in `dev` namespace | `docs/screenshots/kubernetes-dev-resources.png` |
+| HTTPS ingress browser view | `docs/screenshots/https-ingress.png` |
 
-<div align="center">
+## Future Improvements
 
-If this project was useful, a ⭐ is appreciated.
+- Add a Helm/ArgoCD migration Job for `prisma migrate deploy`.
+- Move secrets to External Secrets, Sealed Secrets, or SOPS.
+- Commit cert-manager `ClusterIssuer` and `Certificate` manifests so TLS is fully GitOps-managed.
+- Replace self-signed/internal TLS with Let's Encrypt using a public domain or DNS-01 challenge.
+- Finalize Loki/Promtail or another log ingestion pipeline.
+- Add PostgreSQL backup and restore automation.
+- Add resource requests and limits for app and database workloads.
+- Add NetworkPolicies to restrict pod-to-pod communication.
+- Add image pull secret support if the GHCR package is private.
+- Add automated CI checks: lint, type check, unit tests, build verification, and smoke tests.
+- Add Kubernetes readiness checks for database availability.
+- Add staging/prod values files or separate ArgoCD Applications.
+- Add Terraform or Ansible for Proxmox/k3s/bootstrap provisioning.
+- Expand from single-node k3s to a multi-node cluster.
+- Add app-specific metrics and ServiceMonitor resources.
+- Add documentation under:
+  - `docs/architecture.md`
+  - `docs/runbook.md`
+  - `docs/troubleshooting.md`
+  - `docs/screenshots/`
 
-</div>
+## Interview Talking Points
+
+### What I Built
+
+I built a full-stack ERP-style application and deployed it through a homelab GitOps workflow. The project includes the app, database schema, container image, GitHub Actions image pipeline, Helm chart, ArgoCD Application, Kubernetes ingress, TLS, persistent PostgreSQL storage, and monitoring through the homelab platform.
+
+### Why GitOps
+
+GitOps gives the cluster a declared desired state. Instead of manually changing Kubernetes resources and trying to remember what changed, the Helm chart in Git becomes the source of truth and ArgoCD reconciles the cluster back to that state.
+
+### Why Immutable Tags
+
+Immutable Git SHA image tags make deployments traceable. If a rollout works or fails, I can identify exactly which commit produced that image. Rollback is also clearer because Helm can point back to an earlier SHA.
+
+### Why ClusterIP for PostgreSQL
+
+The app needs database access, but the LAN does not. Keeping PostgreSQL behind a ClusterIP reduces exposure and forces access through Kubernetes-internal networking. External users reach only the app through Traefik ingress.
+
+### What Went Wrong and How I Debugged It
+
+The most important debugging path was the ARM64/AMD64 mismatch. The image worked on the Apple Silicon development machine but failed on the AMD64 k3s node. That led to learning the difference between local Docker images and k3s containerd images, then moving to GHCR pulls and an explicit Buildx `linux/amd64` build.
+
+Other useful incidents were the `imagePullPolicy: Never` issue, PVC drift with ArgoCD, and realizing Prisma migrations need their own deployment step rather than assuming app rollout creates database tables.
+
+### What I Would Improve Next
+
+The next platform improvements are migration automation, secret management, GitOps-managed TLS resources, PostgreSQL backups, and stronger CI checks. Those would move the project closer to a repeatable internal platform pattern while keeping the homelab scope honest.
+
+## Resume Bullet Suggestions
+
+- Built and deployed a full-stack ERP application on a homelab k3s cluster using Docker, Helm, ArgoCD, Traefik, PostgreSQL, and GitHub Actions.
+- Implemented a GitOps deployment workflow where GitHub Actions builds `linux/amd64` images, pushes to GHCR, updates Helm with immutable Git SHA tags, and ArgoCD reconciles Kubernetes state.
+- Debugged and resolved ARM64/AMD64 container architecture mismatch between Apple Silicon development builds and an AMD64 k3s node by adopting Docker Buildx platform targeting.
+- Migrated manual Kubernetes resources into a Helm chart covering Deployments, ClusterIP Services, Ingress, Secrets, readiness/liveness probes, and PVC-backed PostgreSQL.
+- Configured internal homelab ingress and TLS with Traefik, cert-manager, self-signed certificates, and AdGuard DNS rewrites for `erp-dev.home.lab`.
+- Operated and troubleshot a Kubernetes-based application deployment, including image pull policy issues, GHCR pulls, PVC drift, Prisma migration separation, DNS routing, and Grafana dashboard access.

@@ -6,7 +6,7 @@ metadata:
 type: Opaque
 stringData:
   DATABASE_URL: postgresql://{{ .Values.postgres.user }}:{{ .Values.postgres.password }}@{{ .Values.postgres.name }}:{{ .Values.postgres.port }}/{{ .Values.postgres.database }}
-  NEXTAUTH_URL: http://{{ .Values.ingress.host }}
+  NEXTAUTH_URL: https://{{ .Values.ingress.host }}
   NEXTAUTH_SECRET: change-this-in-real-production
 ---
 apiVersion: apps/v1
@@ -75,16 +75,6 @@ spec:
 
   rules:
     - host: {{ .Values.ingress.host }}
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ .Values.app.name }}
-                port:
-                  number: 80
-{{- end }}
       http:
         paths:
           - path: /

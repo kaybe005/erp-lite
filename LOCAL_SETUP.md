@@ -29,7 +29,7 @@ This repository now includes:
 ```bash
 npm install
 cp .env.example .env
-docker compose up -d postgres
+docker compose up -d db
 npm run db:generate
 npm run db:migrate:deploy
 npm run db:seed
