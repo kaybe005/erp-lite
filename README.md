@@ -8,16 +8,16 @@ This is a **homelab production-style workflow**, not a high-availability product
 
 ERP Lite started as a normal full-stack web app and evolved into a platform deployment project. The repository now contains:
 
-| Area | Implementation |
-| --- | --- |
-| Application | Next.js App Router, React, TypeScript, server/client components, REST API route handlers |
-| Data layer | Prisma schema, migrations, seed data, PostgreSQL |
-| Authentication | NextAuth credentials provider with bcrypt password hashing and JWT sessions |
-| Containerization | Multi-stage Dockerfile and Docker Compose for local development |
-| CI/CD | GitHub Actions workflow that builds and pushes AMD64 images to GHCR |
-| Deployment | Helm chart for app, PostgreSQL, services, ingress, PVC, and probes |
-| GitOps | ArgoCD Application manifest targeting the Helm chart |
-| Homelab platform | k3s, Traefik, cert-manager, Prometheus/Grafana, AdGuard DNS, Proxmox |
+| Area             | Implementation                                                                           |
+| ---------------- | ---------------------------------------------------------------------------------------- |
+| Application      | Next.js App Router, React, TypeScript, server/client components, REST API route handlers |
+| Data layer       | Prisma schema, migrations, seed data, PostgreSQL                                         |
+| Authentication   | NextAuth credentials provider with bcrypt password hashing and JWT sessions              |
+| Containerization | Multi-stage Dockerfile and Docker Compose for local development                          |
+| CI/CD            | GitHub Actions workflow that builds and pushes AMD64 images to GHCR                      |
+| Deployment       | Helm chart for app, PostgreSQL, services, ingress, PVC, and probes                       |
+| GitOps           | ArgoCD Application manifest targeting the Helm chart                                     |
+| Homelab platform | k3s, Traefik, cert-manager, Prometheus/Grafana, AdGuard DNS, Proxmox                     |
 
 The goal is to make the deployment path explicit:
 
@@ -107,32 +107,32 @@ sequenceDiagram
 
 Some platform components are installed in the cluster but are not currently managed by this repository.
 
-| Component | In this repo? | Notes |
-| --- | --- | --- |
-| ERP app Dockerfile | Yes | Multi-stage Node image for Next.js |
-| GitHub Actions GHCR build | Yes | Builds `linux/amd64` and updates Helm tag |
-| Helm chart | Yes | App, Postgres, PVC, Services, Ingress, probes, namespace |
-| ArgoCD Application | Yes | `argocd/erp-lite-dev.yaml` |
-| Traefik ingress controller | No | Installed as cluster platform component |
-| cert-manager | No | Installed in cluster; Ingress references `erp-dev-tls-secret` |
-| ClusterIssuer/Certificate manifests | No | Created during homelab setup; good future GitOps addition |
-| Prometheus/Grafana stack | No | Installed as cluster platform component |
-| Loki/Promtail | No | Explored, but log ingestion is not finalized in this repo |
+| Component                           | In this repo? | Notes                                                         |
+| ----------------------------------- | ------------- | ------------------------------------------------------------- |
+| ERP app Dockerfile                  | Yes           | Multi-stage Node image for Next.js                            |
+| GitHub Actions GHCR build           | Yes           | Builds `linux/amd64` and updates Helm tag                     |
+| Helm chart                          | Yes           | App, Postgres, PVC, Services, Ingress, probes, namespace      |
+| ArgoCD Application                  | Yes           | `argocd/erp-lite-dev.yaml`                                    |
+| Traefik ingress controller          | No            | Installed as cluster platform component                       |
+| cert-manager                        | No            | Installed in cluster; Ingress references `erp-dev-tls-secret` |
+| ClusterIssuer/Certificate manifests | No            | Created during homelab setup; good future GitOps addition     |
+| Prometheus/Grafana stack            | No            | Installed as cluster platform component                       |
+| Loki/Promtail                       | No            | Explored, but log ingestion is not finalized in this repo     |
 
 ## Tech Stack
 
-| Category | Tools |
-| --- | --- |
-| Application | Next.js 16 App Router, React 19, TypeScript 5.7, SWR |
-| UI | Tailwind CSS v4, Radix UI primitives, shadcn-style components, lucide-react, Recharts |
-| Auth | NextAuth v4 credentials provider, bcryptjs, JWT sessions |
-| Database | PostgreSQL 16, Prisma ORM 5.10, Prisma migrations and seed data |
-| Containerization | Docker, multi-stage Dockerfile, Docker Compose |
-| CI/CD | GitHub Actions, Docker Buildx, GHCR |
-| Kubernetes/GitOps | k3s, Helm, ArgoCD |
-| Networking/TLS | Traefik ingress, cert-manager, self-signed/internal TLS, AdGuard DNS rewrites |
-| Observability | Prometheus and Grafana installed in the homelab cluster |
-| Homelab infrastructure | Dell OptiPlex 7080, Proxmox, single-node k3s VM, MacBook Air M2 development machine |
+| Category               | Tools                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| Application            | Next.js 16 App Router, React 19, TypeScript 5.7, SWR                                  |
+| UI                     | Tailwind CSS v4, Radix UI primitives, shadcn-style components, lucide-react, Recharts |
+| Auth                   | NextAuth v4 credentials provider, bcryptjs, JWT sessions                              |
+| Database               | PostgreSQL 16, Prisma ORM 5.10, Prisma migrations and seed data                       |
+| Containerization       | Docker, multi-stage Dockerfile, Docker Compose                                        |
+| CI/CD                  | GitHub Actions, Docker Buildx, GHCR                                                   |
+| Kubernetes/GitOps      | k3s, Helm, ArgoCD                                                                     |
+| Networking/TLS         | Traefik ingress, cert-manager, self-signed/internal TLS, AdGuard DNS rewrites         |
+| Observability          | Prometheus and Grafana installed in the homelab cluster                               |
+| Homelab infrastructure | Dell OptiPlex 7080, Proxmox, single-node k3s VM, MacBook Air M2 development machine   |
 
 ## Application Features
 
@@ -150,8 +150,8 @@ These features are present in the repository code.
 
 Demo users are seeded by `prisma/seed.ts`:
 
-| Role | Email | Password |
-| --- | --- | --- |
+| Role  | Email               | Password   |
+| ----- | ------------------- | ---------- |
 | Admin | `admin@erplite.com` | `admin123` |
 | Staff | `staff@erplite.com` | `staff123` |
 
@@ -241,17 +241,17 @@ Current CI caveat: the active workflow focuses on image build/push and Helm tag 
 
 The Helm chart deploys into the `dev` namespace by default.
 
-| Resource | Name | Purpose |
-| --- | --- | --- |
-| Namespace | `dev` | Isolated namespace for ERP Lite |
-| Secret | `erp-app-secret` | App environment variables |
-| Deployment | `erp-app` | Next.js application pod |
-| Service | `erp-app` | Internal ClusterIP service on port 80 |
-| Ingress | `erp-app` | Traefik route for `erp-dev.home.lab` |
-| Secret | `erp-postgres-secret` | PostgreSQL environment variables |
-| Deployment | `erp-postgres` | PostgreSQL pod |
-| Service | `erp-postgres` | Internal ClusterIP service on port 5432 |
-| PVC | `erp-postgres-pvc` | Persistent PostgreSQL storage |
+| Resource   | Name                  | Purpose                                 |
+| ---------- | --------------------- | --------------------------------------- |
+| Namespace  | `dev`                 | Isolated namespace for ERP Lite         |
+| Secret     | `erp-app-secret`      | App environment variables               |
+| Deployment | `erp-app`             | Next.js application pod                 |
+| Service    | `erp-app`             | Internal ClusterIP service on port 80   |
+| Ingress    | `erp-app`             | Traefik route for `erp-dev.home.lab`    |
+| Secret     | `erp-postgres-secret` | PostgreSQL environment variables        |
+| Deployment | `erp-postgres`        | PostgreSQL pod                          |
+| Service    | `erp-postgres`        | Internal ClusterIP service on port 5432 |
+| PVC        | `erp-postgres-pvc`    | Persistent PostgreSQL storage           |
 
 The app Deployment includes:
 
@@ -406,20 +406,20 @@ Future observability work:
 
 ## Key Problems Solved
 
-| Problem | Cause | Fix / lesson |
-| --- | --- | --- |
-| ARM64 image on AMD64 node | MacBook M2 builds ARM64 images by default | GitHub Actions now uses Docker Buildx with `platforms: linux/amd64` |
-| Docker CLI vs k3s runtime confusion | k3s uses containerd, not the local Docker daemon | Local Docker images are not automatically available to Kubernetes |
-| Manual image import did not scale | Early deployment relied on locally imported images | Moved to GHCR-based image pulls |
-| GHCR pulls blocked | Old manual deployment used `imagePullPolicy: Never` | Helm now uses `imagePullPolicy: Always` |
-| Image traceability | Mutable tags make rollouts hard to audit | Helm deploys immutable Git SHA image tags |
-| Raw YAML drift | Manual Kubernetes resources became hard to repeat | Migrated app and database resources into a Helm chart |
-| GitOps ownership | Manual `kubectl` changes were not the desired long-term workflow | ArgoCD Application now reconciles the Helm chart from Git |
-| PVC drift | Existing PVC size differed from Helm values | Matched Helm values to the existing PVC and learned stateful resource immutability constraints |
-| Missing database schema after rollout | App deployment and DB migrations are separate concerns | Ran `prisma migrate deploy` manually; future improvement is a migration Job or sync hook |
-| TLS setup | Internal apps still benefit from HTTPS | Added Traefik Ingress TLS using a cert-manager-created internal certificate secret |
-| DNS confusion | Old docker-prod VM and k3s VM caused routing ambiguity | Standardized AdGuard DNS rewrites to point `erp-dev.home.lab` and `grafana.home.lab` at the k3s node |
-| Grafana access issues | Credentials/service exposure needed debugging | Reset credentials, exposed Grafana through ingress, and verified Kubernetes dashboards |
+| Problem                               | Cause                                                            | Fix / lesson                                                                                         |
+| ------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| ARM64 image on AMD64 node             | MacBook M2 builds ARM64 images by default                        | GitHub Actions now uses Docker Buildx with `platforms: linux/amd64`                                  |
+| Docker CLI vs k3s runtime confusion   | k3s uses containerd, not the local Docker daemon                 | Local Docker images are not automatically available to Kubernetes                                    |
+| Manual image import did not scale     | Early deployment relied on locally imported images               | Moved to GHCR-based image pulls                                                                      |
+| GHCR pulls blocked                    | Old manual deployment used `imagePullPolicy: Never`              | Helm now uses `imagePullPolicy: Always`                                                              |
+| Image traceability                    | Mutable tags make rollouts hard to audit                         | Helm deploys immutable Git SHA image tags                                                            |
+| Raw YAML drift                        | Manual Kubernetes resources became hard to repeat                | Migrated app and database resources into a Helm chart                                                |
+| GitOps ownership                      | Manual `kubectl` changes were not the desired long-term workflow | ArgoCD Application now reconciles the Helm chart from Git                                            |
+| PVC drift                             | Existing PVC size differed from Helm values                      | Matched Helm values to the existing PVC and learned stateful resource immutability constraints       |
+| Missing database schema after rollout | App deployment and DB migrations are separate concerns           | Ran `prisma migrate deploy` manually; future improvement is a migration Job or sync hook             |
+| TLS setup                             | Internal apps still benefit from HTTPS                           | Added Traefik Ingress TLS using a cert-manager-created internal certificate secret                   |
+| DNS confusion                         | Old docker-prod VM and k3s VM caused routing ambiguity           | Standardized AdGuard DNS rewrites to point `erp-dev.home.lab` and `grafana.home.lab` at the k3s node |
+| Grafana access issues                 | Credentials/service exposure needed debugging                    | Reset credentials, exposed Grafana through ingress, and verified Kubernetes dashboards               |
 
 ## Local Development
 
@@ -508,15 +508,27 @@ Current secret note: the chart contains placeholder/simple secret values suitabl
 
 ## Screenshots
 
-Screenshots are not committed yet. Recommended placeholders:
+## Screenshots
 
-| Screenshot | Suggested path |
-| --- | --- |
-| ERP dashboard | `docs/screenshots/erp-dashboard.png` |
-| ArgoCD Synced/Healthy app | `docs/screenshots/argocd-erp-lite.png` |
-| Grafana Kubernetes dashboard | `docs/screenshots/grafana-kubernetes.png` |
-| Kubernetes resources in `dev` namespace | `docs/screenshots/kubernetes-dev-resources.png` |
-| HTTPS ingress browser view | `docs/screenshots/https-ingress.png` |
+### ERP Dashboard
+
+![ERP dashboard](docs/screenshots/erp-dashboard.png)
+
+### ArgoCD GitOps Application
+
+![ArgoCD ERP Lite synced and healthy](docs/screenshots/argocd-erp-lite.png)
+
+### GitHub Actions Image Pipeline
+
+![GitHub Actions GHCR workflow](docs/screenshots/github-actions-ghcr.png)
+
+### Grafana Kubernetes Monitoring
+
+![Grafana Kubernetes dashboard](docs/screenshots/grafana-kubernetes.png)
+
+### Kubernetes Resources
+
+![Kubernetes dev namespace resources](docs/screenshots/kubernetes-dev-resources.png)
 
 ## Future Improvements
 
