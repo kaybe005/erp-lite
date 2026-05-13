@@ -67,8 +67,24 @@ metadata:
   namespace: {{ .Values.namespace }}
 spec:
   ingressClassName: {{ .Values.ingress.className }}
+
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: erp-dev-tls-secret
+
   rules:
     - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Values.app.name }}
+                port:
+                  number: 80
+{{- end }}
       http:
         paths:
           - path: /
